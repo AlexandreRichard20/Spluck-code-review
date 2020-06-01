@@ -1,0 +1,25 @@
+index=bi360_speedtest_subinfo_summary Test_Result=successful_mapped Test_Type=samknows_emb_udp
+| eval Access_Type = case(Access_Connection_Type="PON","Nokia GPON",
+                          Access_Connection_Type="XPON","Huawei GPON",
+                          Access_Connection_Type="ETH","xDSL OE",
+                          Access_Connection_Type="ATM", "xDSL ATM",
+                          1=1, "Unknown")
+| lookup lookup_speed_tier_info product_code AS Product_Code
+| search service_code IN (IPTV)
+         network_type IN (FTTH) 
+         NOT Access_Type="Unknown"
+         Access_Type IN ("Nokia GPON","Huawei GPON","xDSL OE","xDSL ATM")
+         NOT product_friendly_name IN ("1.5 Gigabit Fibe", "1.5 Gigabit FibeTV")
+         product_friendly_name IN ("1 Gigabit Fibe", "1 Gigabit FibeTV", "0.94 Gigabit Fibe", "0.94 Gigabit FibeTV", "Fibe 500", "FibeTV 500", "Fibe 300", "FibeTV 300", "Fibe 150", "FibeTV 150", "Fibe 100", "FibeTV 100", "Fibe 50", "FibeTV 50", "Fibe 25", "FibeTV 25", "Fibe 15", "FibeTV 15", "Fibe 5", "FibeTV 5")
+         Server_Hostname="184.*"
+| eval DSPercentageMet = Download_Mbps/download_promise*100,
+       USPercentageMet = Upload_Mbps/upload_promise*100
+| eventstats avg(DSPercentageMet) as DSPercentageMet stdev(DSPercentageMet) as DSPercentageMetSTD avg(USPercentageMet) as USPercentageMet stdev(USPercentageMet) as USPercentageMetSTD avg(Jitter) as Jitter avg(Latency) as Latency count(DSPercentageMet) as SpeedTest_count by User_Name, product_friendly_name
+| eval DSPercentageMet = round(DSPercentageMet,2), 
+       USPercentageMet = round(USPercentageMet,2),
+       Jitter = round(Jitter,2), 
+       Latency = round(Latency,2)
+| sort -SpeedTest_count, DSPercentageMet, USPercentageMet, -Latency, -Jitter
+| where DSPercentageMet < 100 OR USPercentageMet < 100 OR Latency > latency_promise
+| dedup User_Name, product_friendly_name, DSPercentageMet, DSPercentageMetSTD, USPercentageMet, USPercentageMetSTD, Latency, Jitter, SpeedTest_count
+| table User_Name, product_friendly_name, DSPercentageMet, DSPercentageMetSTD, USPercentageMet, USPercentageMetSTD, Latency, Jitter, SpeedTest_count
